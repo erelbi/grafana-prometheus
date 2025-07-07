@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Interactive Prometheus & Grafana Presentation</title>
+    
+    <!-- Reveal.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reset.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/theme/black.min.css" id="theme">
+
+    <!-- Font Awesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #121218;
+            --primary-color: #e67e22; /* Prometheus Orange */
+            --secondary-color: #F98532; /* Grafana Orange */
+            --text-color: #e0e0e0;
+            --card-color: #1c1c24;
+            --heading-font: 'Orbitron', sans-serif;
+            --body-font: 'Roboto', sans-serif;
+            --reveal-background-color: var(--bg-color);
+            --reveal-main-font: var(--body-font);
+            --reveal-main-color: var(--text-color);
+            --reveal-heading-font: var(--heading-font);
+            --reveal-heading-color: var(--primary-color);
+            --reveal-heading-text-transform: uppercase;
+            --reveal-link-color: var(--secondary-color);
+        }
+
+        .reveal .slides section {
+            text-align: center;
+        }
+
+        .reveal h1, .reveal h2, .reveal h3 {
+            letter-spacing: 2px;
+        }
+        .reveal h2 i {
+            margin-right: 15px;
+        }
+        .reveal p {
+            font-size: 0.8em;
+            max-width: 75%; /* Adjusted for better fit */
+            margin: 20px auto;
+        }
+        .reveal .quote {
+            font-style: italic;
+            color: #aaa;
+            border-left: 3px solid var(--secondary-color);
+            padding-left: 20px;
+            margin: 40px auto;
+            text-align: left;
+            max-width: 700px;
+            font-size: 0.7em;
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-top: 30px; }
+        .card { background-color: var(--card-color); padding: 20px; border-radius: 10px; border: 1px solid #2c2c3a; text-align: left; font-size: 0.7em; }
+        .card i { font-size: 2em; color: var(--primary-color); margin-bottom: 15px; display: block; text-align: center; }
+        .card h3 { color: var(--secondary-color); font-size: 1.2em; }
+        .card p { font-size: 1em; }
+        .card .card-code { 
+            background-color: #111; 
+            padding: 15px; 
+            border-radius: 8px; 
+            color: #f8f8f2; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 1em; 
+            text-align: left; 
+            white-space: pre; /* FIX: Changed to pre to respect indentation */
+            margin-top: 10px; 
+        }
+
+
+        /* Interactive Chart */
+        #interactive-chart { position: relative; width: 100%; max-width: 800px; height: 550px; margin: 20px auto; background-color: var(--card-color); border: 1px solid #333; border-radius: 10px; transform: scale(0.9); }
+        .node { position: absolute; padding: 10px 15px; border: 2px solid var(--primary-color); border-radius: 50px; background-color: rgba(28, 28, 36, 0.9); cursor: pointer; transition: all 0.3s ease; backdrop-filter: blur(5px); z-index: 10; font-size: 0.7em; }
+        .node.active, .node:hover { background-color: var(--primary-color); color: var(--bg-color); transform: scale(1.15) !important; box-shadow: 0 0 25px var(--primary-color); }
+        .node.related { box-shadow: 0 0 25px var(--secondary-color); border-color: var(--secondary-color); }
+        #node-prometheus { top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1.2); }
+        #node-grafana { top: 80%; left: 75%; }
+        #node-alertmanager { top: 20%; left: 75%; }
+        #node-exporters { top: 20%; left: 25%; }
+        #node-pushgateway { top: 80%; left: 25%; }
+        #node-service-discovery { top: 5%; left: 50%; transform: translateX(-50%); }
+        #node-storage { top: 95%; left: 50%; transform: translateX(-50%); }
+        
+        .flow-path { position: absolute; stroke: #444; stroke-width: 3px; stroke-dasharray: 10 5; fill: none; transition: all 0.5s ease; z-index: 1; }
+        .flow-path.active { stroke: var(--secondary-color); stroke-width: 4px; }
+
+        /* UPDATED MODAL STYLES */
+        #modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.8); backdrop-filter: blur(8px); }
+        .modal-content { 
+            background-color: var(--card-color); 
+            margin: 10% auto; 
+            padding: 40px; 
+            border: 2px solid;
+            border-image-slice: 1;
+            border-image-source: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            width: 90%; 
+            max-width: 700px; 
+            border-radius: 15px; 
+            font-size: 18px; 
+            text-align: left;
+            box-shadow: 0 0 40px rgba(0,0,0,0.6);
+        }
+        .close { color: #aaa; float: right; font-size: 32px; font-weight: bold; cursor: pointer; line-height: 1; }
+        .close:hover { color: white; }
+        #modal-title {
+            font-family: var(--heading-font);
+            color: var(--primary-color);
+            font-size: 1.8em;
+            margin-top: 0;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+        #modal-description {
+            font-family: var(--body-font);
+            line-height: 1.7;
+            font-size: 1em;
+            margin-bottom: 25px;
+        }
+        #modal-relations-title {
+            font-family: var(--heading-font);
+            color: var(--secondary-color);
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        #modal-relations {
+            font-family: var(--body-font);
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        
+        .chart-container { background-color: var(--card-color); padding: 15px; border-radius: 8px; border: 1px solid #2c2c3a; margin-top: 15px; height: 250px; position: relative; }
+
+        /* PromQL Interactive Section Styles */
+        #promql-interactive-container {
+            background-color: var(--card-color);
+            border-radius: 10px;
+            border: 1px solid #2c2c3a;
+            padding: 30px;
+            margin-top: 30px;
+            text-align: left;
+            font-size: 0.7em;
+        }
+        .promql-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .promql-tab { background-color: #333; color: var(--text-color); border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease; font-family: var(--body-font); }
+        .promql-tab:hover, .promql-tab.active { background-color: var(--primary-color); color: var(--bg-color); }
+        #promql-explanation { margin-bottom: 20px; min-height: 40px; }
+        #promql-code-display { background-color: #111; padding: 15px; border-radius: 8px; color: #f8f8f2; font-family: 'Courier New', Courier, monospace; font-size: 1.1em; white-space: pre-wrap; min-height: 80px; border-left: 4px solid var(--primary-color); }
+        .promql-code-display-inner .comment { color: #75715e; }
+        .promql-code-display-inner .function { color: #e6db74; }
+        .promql-code-display-inner .metric { color: #a6e22e; }
+        .promql-code-display-inner .operator { color: #f92672; }
+        .promql-code-display-inner .string { color: #fd971f; }
+        .blinking-cursor { animation: blink 1s step-end infinite; }
+        @keyframes blink { from, to { border-right-color: transparent; } 50% { border-right-color: var(--primary-color); } }
+
+        .fixed-logo { position: fixed; top: 20px; right: 30px; z-index: 1000; transition: transform 0.3s ease; }
+        .fixed-logo img { width: 100px; filter: invert(90%) sepia(10%) saturate(100%) hue-rotate(180deg) brightness(150%) contrast(90%); }
+        .fixed-logo:hover { transform: scale(1.1); }
+
+        .linkedin-link { display: inline-flex; align-items: center; gap: 10px; margin-top: 30px; padding: 10px 20px; border-radius: 5px; background-color: #0077b5; color: white; text-decoration: none; font-family: var(--body-font); transition: background-color 0.3s ease; font-size: 0.6em; }
+        .linkedin-link:hover { background-color: #005582; }
+        .linkedin-link i { font-size: 1.5em; }
+
+        /* Alertmanager Animation */
+        .alert-flow { display: flex; justify-content: center; align-items: center; gap: 50px; margin-top: 40px; }
+        .alert-step { text-align: center; font-size: 0.7em; }
+        .alert-step i { font-size: 3em; margin-bottom: 10px; }
+        .alert-arrow { font-size: 2em; color: var(--secondary-color); }
+        .phone-alert { position: relative; }
+        .phone-alert .notification {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #e44d26;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            animation: pop 0.5s ease-out;
+        }
+        .phone-alert.shake { animation: shake 0.5s; }
+        @keyframes pop { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { translateX(5px); } }
+
+        /* Grafana Animation */
+        .grafana-flow { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 40px; width: 80%; margin-left: auto; margin-right: auto;}
+        .grafana-step { text-align: center; font-size: 0.7em; }
+        .grafana-step i { font-size: 4em; }
+        .grafana-dashboard {
+            background-color: #2a2a32;
+            border-radius: 10px;
+            padding: 20px;
+            width: 450px;
+            height: 300px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 15px;
+            border: 1px solid #444;
+        }
+        .dashboard-panel {
+            background-color: #3c3c44;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            color: var(--secondary-color);
+            position: relative;
+            overflow: hidden;
+        }
+        .dashboard-panel.stat { font-size: 1em; flex-direction: column; }
+        .stat-value { font-size: 2em; font-family: var(--heading-font); }
+        .stat-label { font-size: 0.7em; color: #aaa; }
+        .line-chart-path {
+            stroke: var(--secondary-color);
+            stroke-width: 3;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: draw-line 2s ease-out forwards;
+        }
+        @keyframes draw-line {
+            to { stroke-dashoffset: 0; }
+        }
+        
+        /* Summary Table */
+        .summary-table {
+            margin: 40px auto;
+            width: 80%;
+            font-size: 0.7em;
+            border-collapse: collapse;
+        }
+        .summary-table th, .summary-table td {
+            border: 1px solid #444;
+            padding: 12px;
+            text-align: left;
+        }
+        .summary-table th {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+        }
+        .summary-table td:first-child {
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+
+        /* NEW Config Section Layout */
+        .config-container {
+            width: 70%;
+            margin: 20px auto;
+            position: relative;
+            min-height: 350px; /* Set height to contain the blocks */
+        }
+        .config-block {
+            background: var(--card-color);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-color);
+            font-size: 0.7em;
+            text-align: left;
+            position: absolute;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .config-block h3 {
+            margin-top: 0;
+            font-size: 1.1em;
+        }
+        .config-block p {
+            font-size: 0.9em;
+            margin: 0 0 10px 0;
+            max-width: 100%;
+        }
+        .config-code {
+            background: #111;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            white-space: pre;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="fixed-logo">
+        <a href="https://www.turksat.com.tr/" target="_blank" rel="noopener noreferrer">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/T%C3%BCrksat_logo.svg" alt="TÜRKSAT Logo">
+        </a>
+    </div>
+
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- 1. Title Slide -->
+            <section>
+                <i class="fa-solid fa-anchor fa-5x" style="color:var(--primary-color);"></i>
+                <h1>Prometheus & Grafana</h1>
+                <p>An Interactive Journey into Modern Monitoring</p>
+            </section>
+
+            <!-- 2. Why Monitoring? -->
+            <section>
+                <h2><i class="fa-solid fa-binoculars"></i>Why Monitoring?</h2>
+                <p class="fragment">Monitoring is the captain's watchtower on a ship. It helps you detect icebergs (problems) early and steer away before they cause damage, ensuring smooth sailing for your users.</p>
+                <div class="quote fragment">"Keep an eye on the horizon, sense the coming storm!"</div>
+            </section>
+
+            <!-- 3. What is Prometheus? -->
+            <section>
+                <h2><i class="fa-solid fa-ship"></i>What is Prometheus?</h2>
+                <p class="fragment">It's a vigilant lookout post on a ship sailing the vast sea of applications. An in-memory, dimensional time-series database armed with its own query language (PromQL).</p>
+                <div class="quote fragment">"The ship's log never lies; it records the wave, the storm, and the safe harbor just as they are."</div>
+            </section>
+
+            <!-- 4. Interactive Architecture -->
+            <section>
+                <h2><i class="fa-solid fa-compass"></i>Interactive Architecture</h2>
+                <p>Click on the components to understand their roles and explore the data flow.</p>
+                <div id="interactive-chart">
+                    <svg width="100%" height="100%" style="position:absolute; top:0; left:0;">
+                        <path id="path-sd-prom" class="flow-path" d="M400 33 L400 260" />
+                        <path id="path-exp-prom" class="flow-path" d="M225 110 L380 260" />
+                        <path id="path-prom-stor" class="flow-path" d="M400 320 L400 515" />
+                        <path id="path-prom-am" class="flow-path" d="M430 290 L585 120" />
+                        <path id="path-prom-graf" class="flow-path" d="M430 310 L585 460" />
+                        <path id="path-pg-prom" class="flow-path" d="M225 460 L380 320" />
+                    </svg>
+                    <div id="node-service-discovery" class="node" data-node="sd">Service Discovery</div>
+                    <div id="node-exporters" class="node" data-node="exp">Exporters</div>
+                    <div id="node-prometheus" class="node" data-node="prom">Prometheus</div>
+                    <div id="node-storage" class="node" data-node="stor">Storage</div>
+                    <div id="node-alertmanager" class="node" data-node="am">Alertmanager</div>
+                    <div id="node-grafana" class="node" data-node="graf">Grafana</div>
+                    <div id="node-pushgateway" class="node" data-node="pg">Push Gateway</div>
+                </div>
+            </section>
+
+            <!-- 5. What Prometheus Monitors -->
+            <section>
+                <h2><i class="fa-solid fa-layer-group"></i>What Does Prometheus Monitor?</h2>
+                <p>Prometheus provides visibility into every layer of your fleet, from the engine room to the crow's nest.</p>
+                <div class="grid">
+                    <div class="card fragment" data-fragment-index="1">
+                        <i class="fa-solid fa-server"></i>
+                        <h3>Infrastructure Level</h3>
+                        <p>Monitors Linux/Windows servers for CPU utilization, memory, disk I/O, and filesystem usage to keep your nodes healthy.</p>
+                    </div>
+                    <div class="card fragment" data-fragment-index="2">
+                        <i class="fa-solid fa-box-open"></i>
+                        <h3>Applications & Services</h3>
+                        <p>Tracks custom metrics from your applications, such as request counts, error rates, and processing times for microservices or monoliths.</p>
+                    </div>
+                    <div class="card fragment" data-fragment-index="3">
+                        <i class="fa-solid fa-database"></i>
+                        <h3>Databases & More</h3>
+                        <p>Observes databases (SQL/NoSQL) for connection pools and query performance, and web servers (Nginx/Apache) for uptime and throughput.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. Metric Types -->
+            <section>
+                <h2><i class="fa-solid fa-water"></i>Metric Types</h2>
+                <p>Metrics are the ship's logbook. Here they are, visualized as live charts.</p>
+                <div class="grid">
+                    <div class="card fragment"><i class="fa-solid fa-arrow-trend-up"></i><h3>Counter</h3><p>A cumulative metric that only ever increases. Resets on restart.</p><div class="chart-container"><canvas id="counterChart"></canvas></div></div>
+                    <div class="card fragment"><i class="fa-solid fa-gauge-high"></i><h3>Gauge</h3><p>A snapshot value that can go up or down.</p><div class="chart-container"><canvas id="gaugeChart"></canvas></div></div>
+                    <div class="card fragment"><i class="fa-solid fa-chart-bar"></i><h3>Histogram</h3><p>Samples observations and counts them in buckets.</p><div class="chart-container"><canvas id="histogramChart"></canvas></div></div>
+                </div>
+            </section>
+
+            <!-- 7. PromQL -->
+            <section>
+                <h2><i class="fa-solid fa-scroll"></i>Deep Dive into PromQL</h2>
+                <p>PromQL is the powerful language used to query data. Click the tabs below to explore its key features.</p>
+                <div id="promql-interactive-container">
+                    <div class="promql-tabs"></div>
+                    <div id="promql-explanation"><p>Select a concept to begin...</p></div>
+                    <div id="promql-code-display">
+                        <span class="promql-code-display-inner"></span><span class="blinking-cursor" style="border-right: .15em solid var(--primary-color);">&nbsp;</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 8. Exporters -->
+            <section>
+                <h2><i class="fa-solid fa-life-ring"></i>Exporters</h2>
+                <p class="fragment">Exporters are the lookouts. They are sidecar processes that translate metrics from third-party systems into the Prometheus format.</p>
+                <div class="quote fragment">"A captain without lookouts sails blind; Prometheus without exporters watches nothing."</div>
+            </section>
+
+            <!-- 9. Configuring Prometheus -->
+            <section>
+                <h2><i class="fa-solid fa-gears"></i>Configuring Prometheus</h2>
+                <p>The `prometheus.yml` file is the main configuration that defines everything Prometheus does.</p>
+                <div class="config-container">
+                    <div class="config-block fragment fade-out" data-fragment-index="1">
+                        <h3><i class="fa-solid fa-globe"></i> Global Settings</h3>
+                        <p>Define default behaviors, like how often to scrape targets.</p>
+                        <div class="config-code">scrape_interval: 15s</div>
+                    </div>
+                    <div class="config-block fragment fade-out" data-fragment-index="2">
+                        <h3><i class="fa-solid fa-bullseye"></i> Scrape Configs</h3>
+                        <p>Define the jobs and targets that Prometheus will scrape for metrics.</p>
+                        <div class="config-code">static_configs:
+- targets: ['localhost:9090']</div>
+                    </div>
+                    <div class="config-block fragment" data-fragment-index="3">
+                        <h3><i class="fa-solid fa-floppy-disk"></i> Recording Rules</h3>
+                        <p>Pre-compute expensive queries and save their result as a new time series.</p>
+                        <div class="config-code">- record: job:http_requests:rate
+  expr: sum(rate(http_requests_total[5m])) by (job)</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 10. Quick Summary -->
+            <section>
+                <h2><i class="fa-solid fa-book-open"></i>Configuration Summary</h2>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="fragment">
+                            <td>prometheus.yml</td>
+                            <td>The master configuration file.</td>
+                        </tr>
+                        <tr class="fragment">
+                            <td>Scrape Interval</td>
+                            <td>How often to collect metrics from targets.</td>
+                        </tr>
+                        <tr class="fragment">
+                            <td>Targets</td>
+                            <td>Which systems/services to monitor.</td>
+                        </tr>
+                        <tr class="fragment">
+                            <td>Rules</td>
+                            <td>Defines logic for recording new metrics and for alerting.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- 11. Alertmanager -->
+            <section>
+                <h2><i class="fa-solid fa-flag"></i>Alertmanager</h2>
+                <p>A good lookout is useless if they can't warn the crew. Alertmanager handles alerts from Prometheus, routing them to the correct channels.</p>
+                <div class="alert-flow">
+                    <div class="alert-step fragment" data-fragment-index="1">
+                        <i class="fa-solid fa-tower-broadcast" style="color: var(--primary-color)"></i>
+                        <p>Prometheus Fires Alert</p>
+                    </div>
+                    <div class="alert-arrow fragment" data-fragment-index="2">
+                        <i class="fa-solid fa-arrow-right-long"></i>
+                    </div>
+                    <div class="alert-step fragment" data-fragment-index="2">
+                        <i class="fa-solid fa-siren-on" style="color: var(--secondary-color)"></i>
+                        <p>Alertmanager Processes</p>
+                    </div>
+                    <div class="alert-arrow fragment" data-fragment-index="3">
+                        <i class="fa-solid fa-arrow-right-long"></i>
+                    </div>
+                    <div class="alert-step fragment" data-fragment-index="3">
+                        <div id="phone-alert" class="phone-alert">
+                            <i class="fa-solid fa-mobile-screen-button"></i>
+                            <div id="phone-notification" class="notification" style="display: none;">1</div>
+                        </div>
+                        <p>Sysadmin Notified</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 12. Grafana -->
+            <section>
+                 <h2><i class="fa-solid fa-tachograph-digital"></i>Grafana: The Control Panel</h2>
+                 <p>Grafana is the ship's command bridge, where data from all sensors is visualized on a single screen. It turns raw data into beautiful, insightful dashboards.</p>
+                 <div class="grafana-flow">
+                    <div class="grafana-step fragment" data-fragment-index="1">
+                        <i class="fa-solid fa-database" style="color: var(--primary-color)"></i>
+                        <p>Prometheus Data</p>
+                    </div>
+                    <div class="alert-arrow fragment" data-fragment-index="2">
+                        <i class="fa-solid fa-arrow-right-long"></i>
+                    </div>
+                    <div class="grafana-step fragment" data-fragment-index="3">
+                        <div class="grafana-dashboard">
+                            <div class="dashboard-panel">
+                                <svg viewbox="0 0 100 50" style="width: 100%; height: 100%;">
+                                    <path class="line-chart-path" d="M 0 40 Q 25 10, 50 30 T 100 20" />
+                                </svg>
+                            </div>
+                            <div class="dashboard-panel"><i class="fa-solid fa-gauge"></i></div>
+                            <div class="dashboard-panel stat">
+                                <div class="stat-value">99.8%</div>
+                                <div class="stat-label">Uptime (24h)</div>
+                            </div>
+                            <div class="dashboard-panel stat">
+                                <div class="stat-value">52ms</div>
+                                <div class="stat-label">Avg. Latency</div>
+                            </div>
+                        </div>
+                        <p>Grafana Dashboard</p>
+                    </div>
+                 </div>
+            </section>
+            
+            <!-- 13. Final Slide -->
+            <section>
+                <h2>Questions & Answers</h2>
+                <a href="https://www.linkedin.com/company/turksat/" class="linkedin-link" target="_blank" rel="noopener noreferrer">
+                    <i class="fab fa-linkedin"></i>
+                    Connect with TÜRKSAT on LinkedIn
+                </a>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3 id="modal-title" style="color:var(--primary-color);"></h3>
+        <p id="modal-description"></p>
+        <h4 id="modal-relations-title" style="color:var(--secondary-color); margin-top:20px;">Relationships:</h4>
+        <p id="modal-relations"></p>
+      </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.3.1/reveal.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        Reveal.initialize({
+            history: false,
+            transition: 'fade',
+            backgroundTransition: 'fade',
+            center: true,
+            width: 1280,
+            height: 720
+        });
+
+        // --- INTERACTIVE CHART LOGIC ---
+        const nodes = document.querySelectorAll('.node');
+        const paths = document.querySelectorAll('.flow-path');
+        const modal = document.getElementById('modal');
+        const closeModal = document.querySelector('.close');
+
+        const nodeData = {
+            prom: { 
+                title: 'Prometheus Server', 
+                description: 'The core of the system. It scrapes and stores time-series data, allows for querying via PromQL, and evaluates alerting rules based on the collected data.', 
+                relationsText: 'Pulls metrics from Exporters and the Push Gateway. Discovers targets via Service Discovery. Persists data to local Storage. Fires alerts to the Alertmanager. Is used as a primary data source by Grafana for visualization.', 
+                relatedNodes: ['exp', 'pg', 'sd', 'stor', 'am', 'graf'], 
+                relatedPaths: ['path-sd-prom', 'path-exp-prom', 'path-pg-prom', 'path-prom-stor', 'path-prom-am', 'path-prom-graf'] 
+            },
+            exp: { 
+                title: 'Exporters', 
+                description: 'Special-purpose tools that act as translators. They fetch statistics from third-party systems (like a database, web server, or OS) and convert them into the text-based format that Prometheus understands.', 
+                relationsText: 'Prometheus periodically connects to Exporters via HTTP to scrape (pull) the latest metrics.', 
+                relatedNodes: ['prom'], 
+                relatedPaths: ['path-exp-prom'] 
+            },
+            graf: { 
+                title: 'Grafana', 
+                description: 'The leading open-source platform for data visualization, monitoring, and analysis. It allows you to build powerful, dynamic dashboards by querying data from various sources, including Prometheus.', 
+                relationsText: 'Connects to Prometheus as a data source. Users write PromQL queries within Grafana to create panels like graphs, gauges, and tables.', 
+                relatedNodes: ['prom'], 
+                relatedPaths: ['path-prom-graf'] 
+            },
+            am: { 
+                title: 'Alertmanager', 
+                description: 'Handles alerts sent by client applications such as the Prometheus server. It takes care of deduplicating, grouping, and routing them to the correct receiver integrations like email, Slack, or PagerDuty. It also supports silencing and inhibition of alerts.', 
+                relationsText: 'Receives alert notifications from Prometheus when predefined conditions (alerting rules) are met.', 
+                relatedNodes: ['prom'], 
+                relatedPaths: ['path-prom-am'] 
+            },
+            pg: { 
+                title: 'Push Gateway', 
+                description: 'An intermediary for short-lived or batch jobs that cannot be scraped directly. These jobs can push their metrics to the Push Gateway, which then exposes these metrics for Prometheus to scrape.', 
+                relationsText: 'Prometheus scrapes the Push Gateway as a regular target to collect metrics from ephemeral jobs.', 
+                relatedNodes: ['prom'], 
+                relatedPaths: ['path-pg-prom'] 
+            },
+            sd: { 
+                title: 'Service Discovery', 
+                description: 'A mechanism for automatically finding scrape targets. This is crucial in dynamic environments like Kubernetes or cloud platforms, where instances are constantly being created and destroyed. It supports integrations with many platforms (e.g., k8s, Consul, EC2).', 
+                relationsText: 'Provides Prometheus with a list of targets to monitor, removing the need for static configuration.', 
+                relatedNodes: ['prom'], 
+                relatedPaths: ['path-sd-prom'] 
+            },
+            stor: { 
+                title: 'Storage (TSDB)', 
+                description: 'Prometheus includes a highly efficient local on-disk time-series database (TSDB). It stores data in custom-formatted blocks on the local filesystem, optimized for high-speed ingestion and fast querying.', 
+                relationsText: 'Prometheus writes all collected metrics to this local storage and reads from it to serve queries and evaluate rules.', 
+                relatedNodes: ['prom'], 
+                relatedPaths: ['path-prom-stor'] 
+            }
+        };
+
+        nodes.forEach(node => {
+            node.addEventListener('click', (e) => {
+                const nodeId = e.currentTarget.dataset.node;
+                const data = nodeData[nodeId];
+                document.getElementById('modal-title').innerText = data.title;
+                document.getElementById('modal-description').innerText = data.description;
+                document.getElementById('modal-relations').innerText = data.relationsText;
+                modal.style.display = "block";
+                resetHighlights();
+                node.classList.add('active');
+                data.relatedNodes.forEach(id => document.querySelector(`[data-node="${id}"]`).classList.add('related'));
+                data.relatedPaths.forEach(id => document.getElementById(id).classList.add('active'));
+            });
+        });
+
+        function resetHighlights() {
+            nodes.forEach(n => n.classList.remove('active', 'related'));
+            paths.forEach(p => p.classList.remove('active'));
+        }
+
+        closeModal.onclick = () => { modal.style.display = "none"; resetHighlights(); };
+        window.onclick = (event) => { if (event.target == modal) { modal.style.display = "none"; resetHighlights(); } };
+        
+        // --- PromQL Interactive Logic ---
+        const promqlTabsContainer = document.querySelector('.promql-tabs');
+        const promqlExplanationEl = document.getElementById('promql-explanation');
+        const promqlCodeEl = document.querySelector('.promql-code-display-inner');
+        let typeWriterTimeout;
+
+        const promqlData = [
+            { name: 'Filtering', explanation: 'Select time series using metric names and label matchers.', code: `<span class="comment"># API requests, excluding health checks</span>\n<span class="metric">http_requests_total</span>{job=<span class="string">"api-server"</span>, path<span class="operator">!~</span><span class="string">"/healthz|/ready"</span>}` },
+            { name: 'Rate vs. iRate', explanation: 'Use rate() for average trends (graphs), and irate() to catch sharp, sudden spikes (alerting).', code: `<span class="comment"># For general trends and smoother graphs</span>\n<span class="function">rate</span>(<span class="metric">http_requests_total</span>[5m])\n\n<span class="comment"># For sharp, sudden changes</span>\n<span class="function">irate</span>(<span class="metric">http_requests_total</span>[5m])` },
+            { name: 'Aggregation', explanation: 'Summarize data across multiple time series.', code: `<span class="comment"># Top 3 instances by highest CPU usage</span>\n<span class="function">topk</span>(3, <span class="function">sum</span>(<span class="metric">instance_cpu_usage_seconds_total</span>) <span class="operator">by</span> (instance))` },
+            { name: 'Quantiles', explanation: 'Calculate quantiles from histogram buckets, essential for SLOs.', code: `<span class="comment"># 95th percentile request latency over 10m</span>\n<span class="function">histogram_quantile</span>(0.95, <span class="function">sum</span>(<span class="function">rate</span>(<span class="metric">request_duration_seconds_bucket</span>[10m])) <span class="operator">by</span> (le, job))` }
+        ];
+
+        function typeWriter(element, text, i = 0) {
+            if (i < text.length) {
+                if (text.substring(i, i + 1) === '<') {
+                    const endIndex = text.indexOf('>', i);
+                    element.innerHTML += text.substring(i, endIndex + 1);
+                    i = endIndex;
+                } else {
+                    element.innerHTML += text.substring(i, i + 1);
+                }
+                typeWriterTimeout = setTimeout(() => typeWriter(element, text, i + 1), 25);
+            }
+        }
+        
+        function selectPromqlTab(index) {
+            const tabs = document.querySelectorAll('.promql-tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            tabs[index].classList.add('active');
+            const data = promqlData[index];
+            promqlExplanationEl.innerHTML = `<p>${data.explanation}</p>`;
+            clearTimeout(typeWriterTimeout);
+            promqlCodeEl.innerHTML = '';
+            typeWriter(promqlCodeEl, data.code);
+        }
+
+        promqlData.forEach((item, index) => {
+            const tab = document.createElement('button');
+            tab.className = 'promql-tab';
+            tab.innerText = item.name;
+            tab.onclick = () => selectPromqlTab(index);
+            if(promqlTabsContainer) promqlTabsContainer.appendChild(tab);
+        });
+        if (promqlTabsContainer) selectPromqlTab(0);
+
+        // --- Chart.js ---
+        const chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888' }, grid: { color: '#2c2c3a' } }, y: { ticks: { color: '#888' }, grid: { color: '#2c2c3a' } } } };
+        function createCounterChart() { new Chart(document.getElementById('counterChart'), { type: 'line', data: { labels: ['-5m', '-4m', '-3m', '-2m', '-1m', 'now'], datasets: [{ label: 'http_requests_total', data: [1200, 1250, 1350, 1500, 1750, 2100], borderColor: 'rgba(230, 126, 34, 1)', backgroundColor: 'rgba(230, 126, 34, 0.1)', fill: true, tension: 0.4 }] }, options: chartOptions }); }
+        function createGaugeChart() { const usedValue = 75, freeValue = 25; new Chart(document.getElementById('gaugeChart'), { type: 'doughnut', data: { labels: ['Used %', 'Free %'], datasets: [{ label: 'Memory Usage', data: [usedValue, freeValue], backgroundColor: ['rgba(0, 170, 255, 1)', 'rgba(255, 255, 255, 0.1)'], borderColor: 'rgba(28, 28, 36, 1)', borderWidth: 4, circumference: 180, rotation: 270 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#fff' } }, tooltip: { enabled: true } }, cutout: '70%' } }); }
+        function createHistogramChart() { new Chart(document.getElementById('histogramChart'), { type: 'bar', data: { labels: ['<0.1s', '<0.5s', '<1s', '<2s', '>2s'], datasets: [{ label: 'request_duration_seconds', data: [1200, 650, 250, 80, 15], backgroundColor: ['rgba(0, 221, 136, 0.7)', 'rgba(0, 200, 150, 0.7)', 'rgba(0, 170, 255, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(255, 99, 132, 0.7)'], borderWidth: 0 }] }, options: chartOptions }); }
+        
+        Reveal.on('slidechanged', event => {
+            if (event.currentSlide.contains(document.getElementById('counterChart'))) createCounterChart();
+            if (event.currentSlide.contains(document.getElementById('gaugeChart'))) createGaugeChart();
+            if (event.currentSlide.contains(document.getElementById('histogramChart'))) createHistogramChart();
+        });
+        
+        // Alertmanager Animation Trigger
+        Reveal.on('fragmentshown', event => {
+            if (event.fragment.dataset.fragmentIndex === '3') {
+                const phone = document.getElementById('phone-alert');
+                const notification = document.getElementById('phone-notification');
+                if(phone && notification) {
+                    notification.style.display = 'flex';
+                    phone.classList.add('shake');
+                    setTimeout(() => phone.classList.remove('shake'), 500);
+                }
+            }
+        });
+        Reveal.on('fragmenthidden', event => {
+             if (event.fragment.dataset.fragmentIndex === '3') {
+                const notification = document.getElementById('phone-notification');
+                if(notification) notification.style.display = 'none';
+             }
+        });
+
+    </script>
+</body>
+</html>
